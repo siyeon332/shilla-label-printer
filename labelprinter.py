@@ -8,7 +8,7 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
-# PDF 생성을 위한 reportlab 라이브러리 (이외의 추가 폰트 설정 없이 깔끔하게 그리기 위함)
+# PDF 생성을 위한 reportlab 라이브러리
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
@@ -17,8 +17,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
-# 한글 폰트 등록 (별도 폰트 파일 없이 reportlab 내장 한글 CID 폰트 사용)
-# Helvetica 계열은 한글 글리프가 없어 PDF에서 한글이 깨지므로 아래 폰트로 대체한다.
+# PDF 한글 깨짐 방지용 굵은 고딕 폰트 등록
 pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
 
 # 페이지 기본 설정
@@ -71,33 +70,33 @@ def create_shilla_pptx(brand_name: str, label_type: str, total_qty: int, barcode
         for i in range(1, total_qty + 1):
             slide = prs.slides.add_slide(blank_layout)
             
-            # 1. 브랜드명
-            brand_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.8), Inches(10.69), Inches(1.5))
+            # 1. 브랜드명 (크기 96, 맑은 고딕, 굵게 적용)
+            brand_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(10.69), Inches(1.8))
             tf_brand = brand_box.text_frame
             tf_brand.word_wrap = True
             p_brand = tf_brand.paragraphs[0]
             p_brand.text = brand_name
             p_brand.alignment = PP_ALIGN.CENTER
             p_brand.font.name = "맑은 고딕"
-            p_brand.font.size = Pt(64)
-            p_brand.font.bold = True
+            p_brand.font.size = Pt(96)  # 요청하신 96 크기 반영!
+            p_brand.font.bold = True    # 엄청 두껍고 힘 있게!
             
-            # 2. PLT/BOX 번호 (예: PLT NO. 5-1)
-            plt_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.2), Inches(10.69), Inches(1.2))
+            # 2. PLT/BOX 번호 (크기 72, 맑은 고딕, 굵게 적용)
+            plt_box = slide.shapes.add_textbox(Inches(0.5), Inches(2.3), Inches(10.69), Inches(1.5))
             tf_plt = plt_box.text_frame
             tf_plt.word_wrap = True
             p_plt = tf_plt.paragraphs[0]
             p_plt.text = f"{label_type} NO. {total_qty}-{i}"
             p_plt.alignment = PP_ALIGN.CENTER
             p_plt.font.name = "맑은 고딕"
-            p_plt.font.size = Pt(54)
-            p_plt.font.bold = True
+            p_plt.font.size = Pt(72)    # 96 크기에 맞춰 밸런스 있게 키웠습니다!
+            p_plt.font.bold = True      # 굵게 적용!
             
-            # 3. 바코드 이미지
+            # 3. 바코드 이미지 위치 조정 (상단 글자가 커졌으므로 위치를 아래로 살짝 내림)
             img_width = Inches(8.5)
-            img_height = Inches(4.0)
+            img_height = Inches(3.8)
             img_left = (prs.slide_width - img_width) / 2
-            img_top = Inches(3.7)
+            img_top = Inches(4.0)
             slide.shapes.add_picture(tmp_barcode_path, img_left, img_top, width=img_width, height=img_height)
             
     finally:
@@ -111,37 +110,30 @@ def create_shilla_pptx(brand_name: str, label_type: str, total_qty: int, barcode
 
 # --- [기능 3] PDF 라벨 일괄 생성 ---
 def create_shilla_pdf(brand_name: str, label_type: str, total_qty: int, barcode_value: str) -> io.BytesIO:
-    # PDF를 메모리 내에 생성
     pdf_buffer = io.BytesIO()
-    
-    # 가로형 A4 크기 (841.89 * 595.27 포인트)
-    pagesize = (841.89, 595.27)
+    pagesize = (841.89, 595.27) # A4 가로 크기
     c = canvas.Canvas(pdf_buffer, pagesize=pagesize)
     
     for i in range(1, total_qty + 1):
-        # 1. 브랜드명 작성
-        c.setFont("HYGothic-Medium", 60)
-        c.drawCentredString(pagesize[0]/2.0, 480, brand_name)
+        # 1. 브랜드명 작성 (PDF에서도 무너지지 않도록 크기 90으로 든든하게 배치)
+        c.setFont("HYGothic-Medium", 90)
+        c.drawCentredString(pagesize[0]/2.0, 460, brand_name)
         
-        # 2. PLT / BOX 번호 작성 (예: PLT NO. 5-1)
-        c.setFont("HYGothic-Medium", 50)
-        c.drawCentredString(pagesize[0]/2.0, 390, f"{label_type} NO. {total_qty}-{i}")
+        # 2. PLT / BOX 번호 작성 (크기 68로 조화롭게 조정)
+        c.setFont("HYGothic-Medium", 68)
+        c.drawCentredString(pagesize[0]/2.0, 360, f"{label_type} NO. {total_qty}-{i}")
         
         # 3. Code 128 바코드 그리기
-        # Reportlab 자체 바코드 위젯 사용
         barcode_obj = code128.Code128(barcode_value, barWidth=1.8, barHeight=140, humanReadable=True)
-        # 바코드 밑에 표시되는 글자 폰트 설정
-        barcode_obj.fontName = "Helvetica"
-        barcode_obj.fontSize = 15
+        barcode_obj.fontName = "Helvetica-Bold" # 바코드 아래 숫자는 굵은 헬베티카로 선명하게!
+        barcode_obj.fontSize = 16
         
-        # 바코드를 정중앙에 배치하기 위한 위치 계산
         barcode_width = barcode_obj.width
         x_pos = (pagesize[0] - barcode_width) / 2.0
-        y_pos = 120
+        y_pos = 90
         
         barcode_obj.drawOn(c, x_pos, y_pos)
         
-        # 다음 페이지 추가 (마지막 페이지가 아니면)
         if i < total_qty:
             c.showPage()
             
@@ -150,28 +142,24 @@ def create_shilla_pdf(brand_name: str, label_type: str, total_qty: int, barcode_
     return pdf_buffer
 
 
-# --- 🖥️ 더욱 스마트해진 초간편 웹 화면 (Streamlit UI) ---
+# --- 🖥️ 초간편 웹 화면 (Streamlit UI) ---
 st.title("🏷️ 신라면세점 부착라벨 원스톱 생성기")
 st.markdown("입력하신 수량과 동일하게 파일 페이지가 일괄 구성됩니다.")
 st.write("---")
 
-# 레이아웃 구성
 col1, col2 = st.columns(2)
 
 with col1:
-    # 1. 라벨 종류 선택 (PLT 또는 BOX)
     label_type = st.radio("1. 라벨 형태 선택", ["PLT", "BOX"], horizontal=True)
     brand_name = st.text_input("2. 브랜드명 입력", value="아비브(ABIB)")
 
 with col2:
-    # 2. 수량 하나만 입력 받기
     total_qty = st.number_input(f"3. 총 {label_type} 수량 (N)", min_value=1, value=5, step=1)
     barcode_val = st.text_input("4. 바코드 번호 입력", placeholder="예: 7851260079")
 
 st.write(" ")
 st.write(" ")
 
-# 메인 연산 버튼
 btn_generate_all = st.button("🚀 신라면세점 규격 라벨 파일 생성", type="primary", use_container_width=True)
 
 if btn_generate_all:
@@ -203,7 +191,6 @@ if btn_generate_all:
                 
                 st.success("🎉 라벨 파일들이 성공적으로 디자인되었습니다!")
                 
-                # 생성된 바코드 미리보기
                 st.image(barcode_bytes, caption=f"자동 생성된 Code 128 바코드 ({barcode_val})", width=320)
                 
                 st.write("---")
@@ -212,7 +199,6 @@ if btn_generate_all:
                 dl_col1, dl_col2 = st.columns(2)
                 
                 with dl_col1:
-                    # PPTX 다운로드 버튼
                     st.download_button(
                         label="📥 PPTX 파일 다운로드",
                         data=pptx_output,
@@ -222,7 +208,6 @@ if btn_generate_all:
                     )
                     
                 with dl_col2:
-                    # PDF 다운로드 버튼
                     st.download_button(
                         label="📥 PDF 파일 다운로드",
                         data=pdf_output,
