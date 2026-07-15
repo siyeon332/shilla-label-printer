@@ -1,6 +1,6 @@
 import io
 import os
-import platform
+import urllib.request
 import streamlit as st
 import barcode
 from barcode.writer import ImageWriter
@@ -18,34 +18,31 @@ from reportlab.graphics.barcode import code128
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 
-# --- [안전한 한글 폰트 등록 시스템] ---
-# 시스템에 있는 진짜 '맑은 고딕 굵은체'를 찾아서 PDF 라이브러리에 등록합니다.
-FONT_NAME = "MalgunGothicBold"
-FONT_REGISTERED = False
+# --- [인터넷에서 굵은 한글 폰트 강제 다운로드 시스템] ---
+# Streamlit 서버에 한글 폰트가 없으므로, 눈에 확 띄는 구글의 'Noto Sans KR Bold' (본고딕 굵은체)를 실시간 다운로드합니다.
+FONT_NAME = "NotoSansKR-Bold"
+FONT_FILE = "NotoSansKR-Bold.ttf"
 
-try:
-    system = platform.system()
-    font_path = ""
-    
-    if system == "Windows":
-        # 윈도우의 맑은 고딕 굵은체 경로
-        font_path = os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Fonts", "malgunbd.ttf")
-    elif system == "Darwin": # macOS
-        # 맥의 기본 굵은 고딕 경로
-        font_path = "/System/Library/Fonts/AppFonts/NanumGothicBold.ttf"
-        if not os.path.exists(font_path):
-            font_path = "/Library/Fonts/NanumGothicBold.ttf"
-            
-    if font_path and os.path.exists(font_path):
-        pdfmetrics.registerFont(TTFont(FONT_NAME, font_path))
-        FONT_REGISTERED = True
-except Exception:
-    pass
+@st.cache_resource
+def load_korean_font():
+    """웹 서버 환경에서도 완벽한 한글 출력을 위해 웹에서 굵은 고딕 폰트를 다운로드하여 등록합니다."""
+    try:
+        if not os.path.exists(FONT_FILE):
+            # 구글 웹 폰트 저장소에서 진짜 두껍고 듬직한 본고딕 Bold 폰트 다운로드
+            font_url = "https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf"
+            urllib.request.urlretrieve(font_url, FONT_FILE)
+        
+        pdfmetrics.registerFont(TTFont(FONT_NAME, FONT_FILE))
+        return True
+    except Exception as e:
+        return False
 
-# 만약 로컬 폰트를 찾는 데 실패했을 때를 대비한 2차 백업 (웹 서버 배포 환경 대비)
-if not FONT_REGISTERED:
+# 폰트 로드 실행
+FONT_LOADED = load_korean_font()
+
+# 만약 다운로드 실패 시 쓸 예비용 폰트 이름 설정
+if not FONT_LOADED:
     from reportlab.pdfbase.cidfonts import UnicodeCIDFont
-    # 어쩔 수 없이 내장 한글 폰트를 쓸 때는 최대한 이름을 등록해 둡니다.
     pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
     FONT_NAME = "HYGothic-Medium"
 
@@ -145,7 +142,7 @@ def create_shilla_pdf(brand_name: str, label_type: str, total_qty: int, barcode_
     c = canvas.Canvas(pdf_buffer, pagesize=pagesize)
     
     for i in range(1, total_qty + 1):
-        # 1. 브랜드명 작성 (시스템에서 가져온 진짜 굵은 맑은고딕 사용)
+        # 1. 브랜드명 작성 (인터넷에서 받은 진짜 두껍고 든든한 고딕 폰트 사용!)
         c.setFont(FONT_NAME, 90)
         c.drawCentredString(pagesize[0]/2.0, 460, brand_name)
         
