@@ -1,4 +1,6 @@
 import io
+import os
+import platform
 import streamlit as st
 import barcode
 from barcode.writer import ImageWriter
@@ -15,10 +17,38 @@ from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
-# PDF 한글 깨짐 방지용 굵은 고딕 폰트 등록
-pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+# --- [안전한 한글 폰트 등록 시스템] ---
+# 시스템에 있는 진짜 '맑은 고딕 굵은체'를 찾아서 PDF 라이브러리에 등록합니다.
+FONT_NAME = "MalgunGothicBold"
+FONT_REGISTERED = False
+
+try:
+    system = platform.system()
+    font_path = ""
+    
+    if system == "Windows":
+        # 윈도우의 맑은 고딕 굵은체 경로
+        font_path = os.path.join(os.environ.get("SystemRoot", "C:\\Windows"), "Fonts", "malgunbd.ttf")
+    elif system == "Darwin": # macOS
+        # 맥의 기본 굵은 고딕 경로
+        font_path = "/System/Library/Fonts/AppFonts/NanumGothicBold.ttf"
+        if not os.path.exists(font_path):
+            font_path = "/Library/Fonts/NanumGothicBold.ttf"
+            
+    if font_path and os.path.exists(font_path):
+        pdfmetrics.registerFont(TTFont(FONT_NAME, font_path))
+        FONT_REGISTERED = True
+except Exception:
+    pass
+
+# 만약 로컬 폰트를 찾는 데 실패했을 때를 대비한 2차 백업 (웹 서버 배포 환경 대비)
+if not FONT_REGISTERED:
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    # 어쩔 수 없이 내장 한글 폰트를 쓸 때는 최대한 이름을 등록해 둡니다.
+    pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+    FONT_NAME = "HYGothic-Medium"
+
 
 # 페이지 기본 설정
 st.set_page_config(
@@ -115,12 +145,12 @@ def create_shilla_pdf(brand_name: str, label_type: str, total_qty: int, barcode_
     c = canvas.Canvas(pdf_buffer, pagesize=pagesize)
     
     for i in range(1, total_qty + 1):
-        # 1. 브랜드명 작성 (PDF에서도 무너지지 않도록 크기 90으로 든든하게 배치)
-        c.setFont("HYGothic-Medium", 90)
+        # 1. 브랜드명 작성 (시스템에서 가져온 진짜 굵은 맑은고딕 사용)
+        c.setFont(FONT_NAME, 90)
         c.drawCentredString(pagesize[0]/2.0, 460, brand_name)
         
-        # 2. PLT / BOX 번호 작성 (크기 68로 조화롭게 조정)
-        c.setFont("HYGothic-Medium", 68)
+        # 2. PLT / BOX 번호 작성 (동일한 두껍고 선명한 폰트 적용)
+        c.setFont(FONT_NAME, 68)
         c.drawCentredString(pagesize[0]/2.0, 360, f"{label_type} NO. {total_qty}-{i}")
         
         # 3. Code 128 바코드 그리기
