@@ -15,6 +15,11 @@ from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+# 한글 폰트 등록 (별도 폰트 파일 없이 reportlab 내장 한글 CID 폰트 사용)
+# Helvetica 계열은 한글 글리프가 없어 PDF에서 한글이 깨지므로 아래 폰트로 대체한다.
+pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
 
 # 페이지 기본 설정
 st.set_page_config(
@@ -73,7 +78,7 @@ def create_shilla_pptx(brand_name: str, label_type: str, total_qty: int, barcode
             p_brand = tf_brand.paragraphs[0]
             p_brand.text = brand_name
             p_brand.alignment = PP_ALIGN.CENTER
-            p_brand.font.name = "Arial"
+            p_brand.font.name = "맑은 고딕"
             p_brand.font.size = Pt(64)
             p_brand.font.bold = True
             
@@ -84,7 +89,7 @@ def create_shilla_pptx(brand_name: str, label_type: str, total_qty: int, barcode
             p_plt = tf_plt.paragraphs[0]
             p_plt.text = f"{label_type} NO. {total_qty}-{i}"
             p_plt.alignment = PP_ALIGN.CENTER
-            p_plt.font.name = "Arial"
+            p_plt.font.name = "맑은 고딕"
             p_plt.font.size = Pt(54)
             p_plt.font.bold = True
             
@@ -115,11 +120,11 @@ def create_shilla_pdf(brand_name: str, label_type: str, total_qty: int, barcode_
     
     for i in range(1, total_qty + 1):
         # 1. 브랜드명 작성
-        c.setFont("Helvetica-Bold", 60)
+        c.setFont("HYGothic-Medium", 60)
         c.drawCentredString(pagesize[0]/2.0, 480, brand_name)
         
         # 2. PLT / BOX 번호 작성 (예: PLT NO. 5-1)
-        c.setFont("Helvetica-Bold", 50)
+        c.setFont("HYGothic-Medium", 50)
         c.drawCentredString(pagesize[0]/2.0, 390, f"{label_type} NO. {total_qty}-{i}")
         
         # 3. Code 128 바코드 그리기
