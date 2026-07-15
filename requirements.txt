@@ -1,4 +1,3 @@
-Plaintext
 python-barcode
 python-pptx
 pillow
